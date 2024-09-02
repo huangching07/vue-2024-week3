@@ -1,5 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
+import ShoppingCart from './components/ShoppingCart.vue'
+import OrderInfo from './components/OrderInfo.vue'
+import ProductInfo from './components/ProductInfo.vue'
 
 const data = [
   {
@@ -51,9 +54,18 @@ const data = [
     price: 60
   }
 ]
-const cartData = ref([])
-const remark = ref('')
-const orderData = ref({
+
+const cart = ref({
+  items: [],
+  remark: '',
+  total: computed(() => {
+    return cart.value.items.reduce((pre, cur) => {
+      return (pre += cur.price * cur.quantity)
+    }, 0)
+  })
+})
+
+const order = ref({
   id: 0,
   items: [],
   remark: '',
@@ -62,13 +74,13 @@ const orderData = ref({
 
 const addToCart = (id) => {
   // 判斷是否已在購物車中，有的話數量加1
-  const cartIndex = cartData.value.findIndex((item) => item.id === id)
-  if (cartIndex != -1) {
-    cartData.value[cartIndex].quantity++
+  const itemIndex = cart.value.items.findIndex((item) => item.id === id)
+  if (itemIndex != -1) {
+    cart.value.items[itemIndex].quantity++
   } else {
     const index = data.findIndex((item) => item.id === id)
     const item = data[index]
-    cartData.value.push({
+    cart.value.items.push({
       id: item.id,
       name: item.name,
       description: item.description,
@@ -78,29 +90,27 @@ const addToCart = (id) => {
   }
 }
 
-const total = computed(() => {
-  return cartData.value.reduce((pre, cur) => {
-    return (pre += cur.price * cur.quantity)
-  }, 0)
-})
+const updateCartRemark = (remark) => {
+  cart.value.remark = remark
+}
 
 const deleteCartItem = (id) => {
-  const index = cartData.value.findIndex((item) => item.id === id)
-  cartData.value.splice(index, 1)
+  const itemIndex = cart.value.items.findIndex((item) => item.id === id)
+  cart.value.items.splice(itemIndex, 1)
 }
 
 const clearCart = () => {
-  cartData.value = []
-  remark.value = ''
+  cart.value.items = []
+  cart.value.remark = ''
 }
 
 const submitCart = () => {
-  orderData.value.id = new Date().getTime()
-  orderData.value.items = cartData.value.map((item, index, arr) => {
+  order.value.id = new Date().getTime()
+  order.value.items = cart.value.items.map((item, index, arr) => {
     return { name: item.name, quantity: item.quantity, subTotal: item.quantity * item.price }
   })
-  orderData.value.remark = remark.value
-  orderData.value.total = total.value
+  order.value.remark = cart.value.remark
+  order.value.total = cart.value.total
   clearCart()
 }
 </script>
@@ -110,113 +120,21 @@ const submitCart = () => {
     <div class="container mt-5">
       <div class="row">
         <div class="col-md-4">
-          <div class="list-group">
-            <a
-              href="#"
-              class="list-group-item list-group-item-action"
-              v-for="item in data"
-              :key="item.id"
-              @click="addToCart(item.id)"
-            >
-              <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">{{ item.name }}</h5>
-                <small>${{ item.price }}</small>
-              </div>
-              <p class="mb-1">{{ item.description }}</p>
-            </a>
-          </div>
+          <ProductInfo :data="data" @add-to-cart="addToCart" />
         </div>
         <div class="col-md-8">
-          <table class="table">
-            <thead>
-              <tr>
-                <th scope="col" width="50">操作</th>
-                <th scope="col">品項</th>
-                <th scope="col">描述</th>
-                <th scope="col" width="90">數量</th>
-                <th scope="col">單價</th>
-                <th scope="col">小計</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in cartData" :key="item.id">
-                <td>
-                  <button type="button" class="btn btn-sm" @click="deleteCartItem(item.id)">
-                    x
-                  </button>
-                </td>
-                <td>{{ item.name }}</td>
-                <td>
-                  <small>{{ item.description }}</small>
-                </td>
-                <td>
-                  <select class="form-select" v-model="item.quantity">
-                    <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
-                  </select>
-                </td>
-                <td>{{ item.price }}</td>
-                <td>{{ item.price * item.quantity }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="alert alert-primary text-center" role="alert" v-if="cartData.length === 0">
-            請選擇商品
-          </div>
-          <div v-else>
-            <div class="text-end mb-3">
-              <h5>
-                總計: <span>${{ total }}</span>
-              </h5>
-            </div>
-            <textarea
-              class="form-control mb-3"
-              rows="3"
-              placeholder="備註"
-              v-model="remark"
-            ></textarea>
-            <div class="text-end">
-              <button class="btn btn-primary" @click="submitCart">送出</button>
-            </div>
-          </div>
+          <ShoppingCart
+            :cart="cart"
+            @update-cart-remark="updateCartRemark"
+            @delete-cart-item="deleteCartItem"
+            @submit-cart="submitCart"
+          />
         </div>
       </div>
       <hr />
       <div class="row justify-content-center">
         <div class="col-8">
-          <div class="alert alert-secondary text-center" role="alert" v-if="orderData.id === 0">
-            尚未建立訂單
-          </div>
-          <div class="card" v-else>
-            <div class="card-body">
-              <div class="card-title">
-                <h5>訂單</h5>
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th scope="col">品項</th>
-                      <th scope="col">數量</th>
-                      <th scope="col">小計</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="item in orderData.items" :key="item.id">
-                      <td>{{ item.name }}</td>
-                      <td>{{ item.quantity }}</td>
-                      <td>{{ item.subTotal }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div class="text-end">
-                  備註: <span>{{ orderData.remark }}</span>
-                </div>
-                <div class="text-end">
-                  <h5>
-                    總計: <span>${{ orderData.total }}</span>
-                  </h5>
-                </div>
-              </div>
-            </div>
-          </div>
+          <OrderInfo :order="order" />
         </div>
       </div>
     </div>
